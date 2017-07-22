@@ -36,35 +36,62 @@ while the other 4 classes correspond to common mistakes.
   library(caret)
   library(randomForest)
   library(AppliedPredictiveModeling)
-  pml.testing = read.csv("pml-testing.csv", row.names = 1)
-  pml.training = read.csv("pml-training.csv", row.names = 1)
+  pml.testing = read.csv("pml-testing.csv", row.names = 1, na.strings = c("NA","#DIV/0!"))
+  pml.training = read.csv("pml-training.csv", row.names = 1, na.strings = c("NA","#DIV/0!"))
 ```
 
-## Features correlation scatterplot
-```{r}
-  ## Visualization
-  str(pml.training$classe)
-  featurePlot(x = pml.training[,-159], 
-              y=pml.training$classe, 
-              plot='pairs')
-```
 
 ## Preprocessing
-```{r}
-  ## Preprocessing
+
   
-  ## -- Exclude near Zero Variance Predictors
+#### Exclude near Zero Variance Predictors
+```{r nearZeroVar}
   excluded <- nearZeroVar(pml.training)
   training <- pml.training[, -excluded]
-  
-  inTrain = createDataPartition(y=training$classe, p=0.80, list=FALSE)
-  t1 = pml.training[inTrain,]
-  v1 = pml.training[-inTrain,]
-  
+  dim(training)
+```
+#### Exclude predictors having more than 80% of NAs
+```{r naRemove}
+  training <- training[ , !colMeans(is.na(training))>.8]
+  dim(training)
+```
 
-  fit = train(classe ~ ., data=t1, method='rf')
-  pred = predict(fit, v1)
+#### Exclude descriptors
+```{r descrRemove}
+  training <- training[, -c(1:5)]
+  dim(training)
+```
+
+
+## Correlated Predictors
+```{r}
+  corPreds <- cor(x=training[,-53])
+  summary(corPreds[upper.tri(corPreds)])
+```
   
+Since there are some highly correlated predictors, it might be better to reduce the impact of those correlations.  
+  
+```{r}
+  highCor <- findCorrelation(corPreds)
+  training <- training[,-highCor]
+  dim(training)
+```
+
+Since there is a lot of variance in the predictors
+```{r}
+  inTrain = createDataPartition(y=training$classe, p=0.80, list=FALSE)
+  t1 = training[inTrain,]
+  v1 = training[-inTrain,]
+  library(doParallel)
+  cl = makeCluster(detectCores()-2)
+  registerDoParallel(cl)
+  set.seed(1017)
+  fit = train(classe ~ ., data=t1, 
+              method='rf')
+  pred = predict(fit, v1)
+  ##stopCluster(cl)
+  predAcc = confusionMatrix(pred, v1$classe)
+  fit
 ```
 
 
