@@ -36,8 +36,8 @@ while the other 4 classes correspond to common mistakes.
   library(caret)
   library(randomForest)
   library(AppliedPredictiveModeling)
-  pml.testing = read.csv("pml-testing.csv", row.names = 1, na.strings = c("NA","#DIV/0!"))
-  pml.training = read.csv("pml-training.csv", row.names = 1, na.strings = c("NA","#DIV/0!"))
+  pml.testing = read.csv("pml-testing.csv", row.names = 1, na.strings = c("NA","#DIV/0!",""))
+  pml.training = read.csv("pml-training.csv", row.names = 1, na.strings = c("NA","#DIV/0!",""))
 ```
 
 
@@ -77,19 +77,48 @@ Since there are some highly correlated predictors, it might be better to reduce 
   dim(training)
 ```
 
-Since there is a lot of variance in the predictors
+Here I choose random forest to trian the model because I think it is the most effective method for such a large number of variables.
+```{r}
+  inTrain = createDataPartition(y=training$classe, p=0.80, list=FALSE)
+  t1 = training[inTrain,]
+  v1 = training[-inTrain,]
+  
+  ## Set seeds for resampling
+  set.seed(1017)
+  seeds = vector(mode="list", length=4001)
+  for(i in 1:4000) seeds[[i]] = sample.int(n=10000,45)
+  seeds[[4001]] = sample.int(10000,1)
+  
+  ## Control list
+  trCtrl = trainControl('cv', seeds=seeds, index=createFolds(pml.training$classe))
+  library(doParallel)
+  cl = makeCluster(detectCores()-1)
+  registerDoParallel(cl)
+  fit = train(classe ~ ., data=t1, 
+              method='rf', trControl=trCtrl)
+  pred = predict(fit, v1)
+  stopCluster(cl)
+  predAcc = confusionMatrix(pred, v1$classe)
+```
+
+Here are our random forest results:
+```{r}
+  predAcc
+  fit
+```
+
 ```{r}
   inTrain = createDataPartition(y=training$classe, p=0.80, list=FALSE)
   t1 = training[inTrain,]
   v1 = training[-inTrain,]
   library(doParallel)
-  cl = makeCluster(detectCores()-2)
+  cl = makeCluster(detectCores()-1)
   registerDoParallel(cl)
   set.seed(1017)
   fit = train(classe ~ ., data=t1, 
-              method='rf')
+              method='gbm')
   pred = predict(fit, v1)
-  ##stopCluster(cl)
+  stopCluster(cl)
   predAcc = confusionMatrix(pred, v1$classe)
   fit
 ```
