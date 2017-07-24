@@ -31,11 +31,13 @@ while the other 4 classes correspond to common mistakes.
 
 # Load and process data
 
-```{r}
-  library(data.table)
+```{r echo=FALSE, warning=FALSE}
+  library(gbm)
+  library(e1071)
   library(caret)
   library(randomForest)
   library(AppliedPredictiveModeling)
+  library(doParallel)
   pml.testing = read.csv("pml-testing.csv", row.names = 1, na.strings = c("NA","#DIV/0!",""))
   pml.training = read.csv("pml-training.csv", row.names = 1, na.strings = c("NA","#DIV/0!",""))
 ```
@@ -52,7 +54,7 @@ while the other 4 classes correspond to common mistakes.
 ```
 #### Exclude predictors having more than 80% of NAs
 ```{r naRemove}
-  training <- training[ , !colMeans(is.na(training))>.8]
+  training <- training[ , !colMeans(is.na(training))>.7]
   dim(training)
 ```
 
@@ -65,7 +67,7 @@ while the other 4 classes correspond to common mistakes.
 
 ## Correlated Predictors
 ```{r}
-  corPreds <- cor(x=training[,-53])
+  corPreds <- cor(x=training[,-54])
   summary(corPreds[upper.tri(corPreds)])
 ```
   
@@ -78,7 +80,7 @@ Since there are some highly correlated predictors, it might be better to reduce 
 ```
 
 Here I choose random forest to trian the model because I think it is the most effective method for such a large number of variables.
-```{r rf, cache=T}
+```{r rf, cache=TRUE}
   inTrain = createDataPartition(y=training$classe, p=0.7, list=FALSE)
   t1 = training[inTrain,]
   v1 = training[-inTrain,]
@@ -89,7 +91,7 @@ Here I choose random forest to trian the model because I think it is the most ef
   for(i in 1:4000) seeds[[i]] = sample.int(n=10000,45)
   seeds[[4001]] = sample.int(10000,1)
   trCtrl = trainControl("cv", 5)
-  library(doParallel)
+  
   cl = makeCluster(detectCores()-2)
   registerDoParallel(cl)
   fitrf = train(classe ~ ., data=t1, 
@@ -102,11 +104,10 @@ Here I choose random forest to trian the model because I think it is the most ef
 Here are our random forest results:
 ```{r}
   predAcc
-  fit
+  fitrf
 ```
 
-```{r gbm, cache=T}
-  library(doParallel)
+```{r gbm, cache=TRUE}
   cl = makeCluster(detectCores()-2)
   registerDoParallel(cl)
   set.seed(1017)
@@ -120,16 +121,15 @@ Here are our gbm's results:
 ```{r}
   predAcc = confusionMatrix(predgbm, v1$classe)
   predAcc
-  fit
+  fitgbm
 ```
 
-Now, random forest is not that fast to execute and accuracy is somewhat close to gbm.
-So I'll keep only gbm for this study.
+Since random forest gets better results for approximately the same performance, I decided I would keep this method.
 
 Now for the final test:
 ```{r}
-  pred = predict(fitgbm, pml.testing)
-  testing = data.frame(pml.testing, classe=pred)
+  pred = predict(fitrf, pml.testing)
+  pred
 ```
 
 
